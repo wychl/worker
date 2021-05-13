@@ -11,9 +11,8 @@ import (
 func main() {
 	wg := sync.WaitGroup{}
 	batch := 5
-	result := 0
+	sum := 0
 	mux := sync.RWMutex{}
-	sum := newSum(&result, &mux)
 	dataChan := make(chan interface{}, 10)
 
 	// goroutine写入数据
@@ -33,30 +32,29 @@ func main() {
 				startValue: i * step,
 				endValue:   endValue,
 			}
-			fmt.Println(i, i*step, (i+1)*step)
 		}
 
 		// 数据已经写完，关闭channel
 		close(dataChan)
 	}()
 
-	worker := worker.New(batch, sum, &wg)
+	worker := worker.New(batch, newExe(&sum, &mux), &wg)
 	ctx := context.Background()
 	worker.Run(dataChan, ctx)
 
 	// 等待计算任务完成
 	<-worker.Finished()
 
-	fmt.Println("sum:", result)
+	fmt.Println("sum:", sum)
 }
 
 // 返回和计算函数
-func newSum(total *int, mux *sync.RWMutex) worker.Exec {
+func newExe(sum *int, mux *sync.RWMutex) worker.Exec {
 	return func(data interface{}) {
 		p := data.(sumPayload)
 		for i := p.startValue; i < p.endValue; i++ {
 			mux.Lock()
-			*total += i
+			*sum += i
 			mux.Unlock()
 		}
 	}
